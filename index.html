@@ -9,6 +9,7 @@
             margin: 0;
             padding: 0;
             box-sizing: border-box;
+            touch-action: none;
         }
         
         body {
@@ -61,6 +62,7 @@
             height: 100vh;
             width: 100%;
             position: relative;
+            overflow: hidden;
         }
         
         #camera-view {
@@ -79,10 +81,13 @@
         
         #shirt {
             position: absolute;
-            pointer-events: none;
+            left: 50%;
+            top: 30%;
+            transform: translate(-50%, -50%) scaleX(-1);
+            pointer-events: auto;
             z-index: 10;
-            display: none;
-            transform: scaleX(-1);
+            touch-action: none;
+            width: 200px;
         }
         
         #controls {
@@ -90,6 +95,8 @@
             display: flex;
             justify-content: space-between;
             background: rgba(0,0,0,0.7);
+            position: relative;
+            z-index: 20;
         }
         
         #back-button, #flip-button {
@@ -101,50 +108,55 @@
             cursor: pointer;
         }
         
-        #status {
-            color: white;
-            align-self: center;
+        #zoom-controls {
+            position: absolute;
+            right: 15px;
+            top: -60px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 20;
         }
         
-        .loader {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-size: 18px;
-            z-index: 5;
+        .zoom-btn {
+            background: rgba(255,255,255,0.7);
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            font-size: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
         }
     </style>
 </head>
 <body>
     <div id="start-screen">
         <h1>Виртуальная примерка футболки</h1>
-    src="image.png"
+        <!-- ВСТАВЬТЕ СВОЕ ИЗОБРАЖЕНИЕ ФУТБОЛКИ -->
         <img id="product-image" src="image.png" alt="Футболка">
-        <p>Нажмите кнопку ниже, чтобы примерить футболку с помощью камеры</p>
+        <p>Нажмите кнопку ниже, чтобы примерить футболку</p>
         <button id="try-button">Примерить</button>
     </div>
     
     <div id="camera-screen">
         <div id="camera-view">
-            <div class="loader">Загрузка...</div>
             <video id="camera" autoplay playsinline></video>
-         src="image.png"
+            <!-- ВСТАВЬТЕ ТУТ ЖЕ ИЗОБРАЖЕНИЕ ФУТБОЛКИ -->
             <img id="shirt" src="image.png" alt="Футболка">
+            
+            <div id="zoom-controls">
+                <button class="zoom-btn" id="zoom-in">+</button>
+                <button class="zoom-btn" id="zoom-out">-</button>
+            </div>
         </div>
         <div id="controls">
             <button id="back-button">Назад</button>
-            <div id="status">Идет загрузка...</div>
-            <button id="flip-button">Перевернуть</button>
+            <button id="flip-button">Перевернуть камеру</button>
         </div>
     </div>
-
-    <!-- Подключаем библиотеки MediaPipe -->
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
     <script>
         // Элементы интерфейса
@@ -153,26 +165,38 @@
         const tryButton = document.getElementById('try-button');
         const backButton = document.getElementById('back-button');
         const flipButton = document.getElementById('flip-button');
+        const zoomInBtn = document.getElementById('zoom-in');
+        const zoomOutBtn = document.getElementById('zoom-out');
         const camera = document.getElementById('camera');
         const shirt = document.getElementById('shirt');
-        const status = document.getElementById('status');
         
         let stream = null;
         let usingFrontCamera = true;
-        let pose = null;
-        let cameraUtils = null;
+        let isDragging = false;
+        let startX, startY, startLeft, startTop;
+        let currentScale = 1;
 
         // Обработчики событий
         tryButton.addEventListener('click', startCamera);
         backButton.addEventListener('click', stopCamera);
         flipButton.addEventListener('click', flipCamera);
+        zoomInBtn.addEventListener('click', () => zoomShirt(1.2));
+        zoomOutBtn.addEventListener('click', () => zoomShirt(0.8));
         
+        // Drag & Drop для футболки
+        shirt.addEventListener('touchstart', handleTouchStart, { passive: false });
+        shirt.addEventListener('touchmove', handleTouchMove, { passive: false });
+        shirt.addEventListener('touchend', handleTouchEnd);
+        
+        shirt.addEventListener('mousedown', handleMouseDown);
+        document.addEventListener('mousemove', handleMouseMove);
+        document.addEventListener('mouseup', handleMouseUp);
+
         // Запуск камеры
         async function startCamera() {
             try {
                 startScreen.style.display = 'none';
                 cameraScreen.style.display = 'flex';
-                status.textContent = 'Загрузка камеры...';
                 
                 // Получаем доступ к камере
                 stream = await navigator.mediaDevices.getUserMedia({
@@ -184,95 +208,16 @@
                 });
                 
                 camera.srcObject = stream;
-                status.textContent = 'Наведите камеру на себя';
-                
-                // Инициализация Pose Detection
-                initPoseDetection();
                 
             } catch (error) {
-                status.textContent = 'Ошибка: ' + error.message;
+                alert('Ошибка доступа к камере: ' + error.message);
                 console.error('Camera error:', error);
                 backButton.style.display = 'block';
             }
         }
         
-        // Инициализация Pose Detection
-        function initPoseDetection() {
-            pose = new Pose({
-                locateFile: (file) => {
-                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
-                }
-            });
-            
-            pose.setOptions({
-                modelComplexity: 1,
-                smoothLandmarks: true,
-                minDetectionConfidence: 0.5,
-                minTrackingConfidence: 0.5
-            });
-            
-            pose.onResults(onPoseResults);
-            
-            cameraUtils = new Camera(camera, {
-                onFrame: async () => {
-                    await pose.send({image: camera});
-                },
-                width: 1280,
-                height: 720
-            });
-            
-            cameraUtils.start();
-        }
-        
-        // Обработка результатов Pose Detection
-        function onPoseResults(results) {
-            if (!results.poseLandmarks) {
-                shirt.style.display = 'none';
-                return;
-            }
-            
-            // Получаем ключевые точки плеч
-            const leftShoulder = results.poseLandmarks[11];
-            const rightShoulder = results.poseLandmarks[12];
-            
-            if (!leftShoulder || !rightShoulder) {
-                shirt.style.display = 'none';
-                return;
-            }
-            
-            // Рассчитываем позицию и размер футболки
-            const videoWidth = camera.videoWidth;
-            const videoHeight = camera.videoHeight;
-            
-            // Центр между плечами
-            const centerX = (leftShoulder.x + rightShoulder.x) / 2 * videoWidth;
-            const centerY = (leftShoulder.y + rightShoulder.y) / 2 * videoHeight;
-            
-            // Расстояние между плечами для определения размера
-            const shoulderDistance = Math.abs(leftShoulder.x - rightShoulder.x) * videoWidth;
-            const shirtWidth = shoulderDistance * 1.8;
-            const shirtHeight = shirtWidth * 1.2;
-            
-            // Позиционируем футболку
-            shirt.style.display = 'block';
-            shirt.style.left = `${centerX}px`;
-            shirt.style.top = `${centerY}px`;
-            shirt.style.width = `${shirtWidth}px`;
-            shirt.style.height = `${shirtHeight}px`;
-        }
-        
         // Остановка камеры
         function stopCamera() {
-            if (cameraUtils) {
-                cameraUtils.stop();
-                cameraUtils = null;
-            }
-            
-            if (pose) {
-                pose.close();
-                pose = null;
-            }
-            
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 stream = null;
@@ -289,17 +234,59 @@
             startCamera();
         }
         
-        // Обработка изменения ориентации экрана
-        window.addEventListener('orientationchange', () => {
-            if (cameraScreen.style.display === 'flex') {
-                setTimeout(() => {
-                    if (cameraUtils) {
-                        cameraUtils.stop();
-                        cameraUtils.start();
-                    }
-                }, 300);
-            }
-        });
+        // Масштабирование футболки
+        function zoomShirt(factor) {
+            currentScale *= factor;
+            shirt.style.transform = `translate(-50%, -50%) scaleX(-1) scale(${currentScale})`;
+        }
+        
+        // Обработчики касаний (для мобильных устройств)
+        function handleTouchStart(e) {
+            e.preventDefault();
+            isDragging = true;
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+            startLeft = parseInt(shirt.style.left) || shirt.offsetLeft;
+            startTop = parseInt(shirt.style.top) || shirt.offsetTop;
+        }
+        
+        function handleTouchMove(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const touch = e.touches[0];
+            const dx = touch.clientX - startX;
+            const dy = touch.clientY - startY;
+            shirt.style.left = (startLeft + dx) + 'px';
+            shirt.style.top = (startTop + dy) + 'px';
+        }
+        
+        function handleTouchEnd() {
+            isDragging = false;
+        }
+        
+        // Обработчики мыши (для компьютеров)
+        function handleMouseDown(e) {
+            e.preventDefault();
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            startLeft = parseInt(shirt.style.left) || shirt.offsetLeft;
+            startTop = parseInt(shirt.style.top) || shirt.offsetTop;
+        }
+        
+        function handleMouseMove(e) {
+            if (!isDragging) return;
+            e.preventDefault();
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+            shirt.style.left = (startLeft + dx) + 'px';
+            shirt.style.top = (startTop + dy) + 'px';
+        }
+        
+        function handleMouseUp() {
+            isDragging = false;
+        }
     </script>
 </body>
 </html>
