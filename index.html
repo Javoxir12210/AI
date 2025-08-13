@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Виртуальная примерка футболки</title>
+<style>
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+body {
+  background: linear-gradient(135deg, #6a11cb 0%, #2575fc 100%);
+  color: white;
+  min-height: 100vh;
+  overflow: hidden;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+}
+
+body::before {
+  content: '';
+  position: absolute;
+  width: 300%;
+  height: 300%;
+  top: -100%;
+  left: -100%;
+  background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+  z-index: -1;
+}
+
+.container {
+  width: 100%;
+  max-width: 1200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  gap: 30px;
+}
+
+.header {
+  text-align: center;
+  padding: 20px;
+  animation: fadeIn 1s ease-out;
+}
+
+.header h1 {
+  font-size: 2.8rem;
+  margin-bottom: 10px;
+  text-shadow: 0 4px 15px rgba(0,0,0,0.2);
+}
+
+.header p {
+  font-size: 1.2rem;
+  max-width: 600px;
+  margin: 0 auto;
+  opacity: 0.9;
+}
+
+.content {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 40px;
+  width: 100%;
+}
+
+.card {
+  background: rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(10px);
+  border-radius: 20px;
+  padding: 30px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  width: 100%;
+  max-width: 400px;
+  text-align: center;
+  animation: slideIn 1s ease-out;
+  border: 1px solid rgba(255,255,255,0.2);
+}
+
+.card h2 {
+  margin-bottom: 20px;
+  font-size: 1.8rem;
+}
+
+.product-card {
+  background: white;
+  border-radius: 15px;
+  overflow: hidden;
+  box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+  margin-bottom: 25px;
+}
+
+.product-card img {
+  width: 100%;
+  display: block;
+  padding: 30px;
+  background: #f8f9fa;
+}
+
+.product-info {
+  padding: 20px;
+  color: #333;
+}
+
+.product-info h3 {
+  font-size: 1.4rem;
+  margin-bottom: 10px;
+}
+
+.product-info .price {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #ff6b6b;
+  margin: 10px 0;
+}
+
+.product-info .description {
+  font-size: 0.95rem;
+  margin-bottom: 20px;
+  color: #555;
+}
+
+.btn {
+  background: linear-gradient(to right, #ff6b6b, #ff8e53);
+  color: white;
+  border: none;
+  padding: 14px 30px;
+  font-size: 1.1rem;
+  border-radius: 50px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 5px 15px rgba(255,107,107,0.4);
+  font-weight: 600;
+  display: inline-block;
+  width: 100%;
+}
+
+.btn:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(255,107,107,0.6);
+}
+
+.btn:active {
+  transform: translateY(1px);
+}
+
+.camera-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: black;
+  z-index: 1000;
+  display: none;
+  flex-direction: column;
+}
+
+.camera-header {
+  padding: 20px;
+  background: rgba(0,0,0,0.7);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  z-index: 10;
+}
+
+.camera-header h2 {
+  font-size: 1.4rem;
+}
+
+.close-btn {
+  background: rgba(255,255,255,0.2);
+  border: none;
+  color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  font-size: 1.2rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.close-btn:hover {
+  background: rgba(255,255,255,0.3);
+}
+
+.camera-view {
+  flex-grow: 1;
+  position: relative;
+  overflow: hidden;
+}
+
+#camera {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+#shirt {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 5;
+  display: none;
+}
+
+.instructions {
+  padding: 15px;
+  background: rgba(0,0,0,0.7);
+  text-align: center;
+  font-size: 0.9rem;
+  z-index: 10;
+}
+
+.instructions p {
+  margin: 5px 0;
+}
+
+.footer {
+  text-align: center;
+  padding: 20px;
+  opacity: 0.8;
+  font-size: 0.9rem;
+  animation: fadeIn 1.5s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-50px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@media (max-width: 768px) {
+  .content {
+    flex-direction: column;
+    align-items: center;
+  }
+  
+  .header h1 {
+    font-size: 2.2rem;
+  }
+  
+  .card {
+    max-width: 100%;
+  }
+}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>Виртуальная примерка футболки</h1>
+    <p>Попробуйте нашу новую футболку не выходя из дома с помощью технологии дополненной реальности</p>
+  </div>
+  
+  <div class="content">
+    <div class="card">
+      <h2>Футболка "Summer Vibes"</h2>
+      
+      <div class="product-card">
+        <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f8f9fa'/%3E%3Cpath d='M50,70 L150,70 L160,100 L150,130 L50,130 L40,100 Z' fill='%2342b883' stroke='%23333333' stroke-width='2'/%3E%3Ccircle cx='100' cy='85' r='15' fill='white'/%3E%3Cpath d='M80,50 L120,50 M100,30 L100,50' stroke='%23333' stroke-width='2' fill='none'/%3E%3C/svg%3E" alt="Футболка">
+        <div class="product-info">
+          <h3>Summer Vibes</h3>
+          <div class="price">1 299 ₽</div>
+          <div class="description">Легкая хлопковая футболка с современным дизайном. Идеальна для лета!</div>
+          <button class="btn" id="tryButton">Примерить в AR</button>
+        </div>
+      </div>
+      
+      <div class="features">
+        <h3>Преимущества:</h3>
+        <ul style="text-align: left; padding: 15px; list-style-type: none;">
+          <li style="padding: 8px 0; display: flex; align-items: center;">
+            <span style="margin-right: 10px; font-size: 1.5rem;">✓</span> 100% хлопок
+          </li>
+          <li style="padding: 8px 0; display: flex; align-items: center;">
+            <span style="margin-right: 10px; font-size: 1.5rem;">✓</span> Удобный крой
+          </li>
+          <li style="padding: 8px 0; display: flex; align-items: center;">
+            <span style="margin-right: 10px; font-size: 1.5rem;">✓</span> Не выгорает на солнце
+          </li>
+          <li style="padding: 8px 0; display: flex; align-items: center;">
+            <span style="margin-right: 10px; font-size: 1.5rem;">✓</span> Доступна в 5 цветах
+          </li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="card">
+      <h2>Как это работает?</h2>
+      <div style="text-align: left; padding: 10px;">
+        <div style="display: flex; align-items: flex-start; margin-bottom: 25px;">
+          <div style="font-size: 2.5rem; margin-right: 15px; background: rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">1</div>
+          <div>
+            <h3>Нажмите "Примерить в AR"</h3>
+            <p>Разрешите доступ к камере вашего устройства</p>
+          </div>
+        </div>
+        
+        <div style="display: flex; align-items: flex-start; margin-bottom: 25px;">
+          <div style="font-size: 2.5rem; margin-right: 15px; background: rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">2</div>
+          <div>
+            <h3>Наведите камеру на себя</h3>
+            <p>Встаньте так, чтобы было видно ваши плечи</p>
+          </div>
+        </div>
+        
+        <div style="display: flex; align-items: flex-start; margin-bottom: 25px;">
+          <div style="font-size: 2.5rem; margin-right: 15px; background: rgba(255,255,255,0.2); width: 50px; height: 50px; border-radius: 50%; display: flex; align-items: center; justify-content: center;">3</div>
+          <div>
+            <h3>Смотрите результат</h3>
+            <p>Футболка автоматически наложится на ваше изображение</p>
+          </div>
+        </div>
+      </div>
+      
+      <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 15px; margin-top: 20px;">
+        <h3>Советы для лучшего результата:</h3>
+        <ul style="text-align: left; padding: 15px;">
+          <li style="padding: 8px 0;">✔️ Используйте хорошее освещение</li>
+          <li style="padding: 8px 0;">✔️ Держите телефон на уровне груди</li>
+          <li style="padding: 8px 0;">✔️ Примерно 1 метр расстояния до камеры</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  
+  <div class="footer">
+    <p>© 2023 Виртуальная примерка одежды | Работает в современных браузерах</p>
+  </div>
+</div>
+
+<div class="camera-container">
+  <div class="camera-header">
+    <h2>Виртуальная примерка</h2>
+    <button class="close-btn" id="closeButton">✕</button>
+  </div>
+  <div class="camera-view">
+    <video id="camera" autoplay playsinline></video>
+    <img id="shirt" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='none'/%3E%3Cpath d='M40,70 L160,70 L170,100 L160,130 L40,130 L30,100 Z' fill='%2342b883' stroke='%23333' stroke-width='2'/%3E%3Ccircle cx='100' cy='85' r='15' fill='white'/%3E%3C/svg%3E" alt="Футболка">
+  </div>
+  <div class="instructions">
+    <p>Встаньте так, чтобы было видно ваши плечи</p>
+    <p>Футболка автоматически появится, когда система вас распознает</p>
+  </div>
+</div>
+
+<script>
+const tryButton = document.getElementById('tryButton');
+const closeButton = document.getElementById('closeButton');
+const card = document.querySelector('.container');
+const cameraContainer = document.querySelector('.camera-container');
+const video = document.getElementById('camera');
+const shirt = document.getElementById('shirt');
+
+// Функция для запуска AR
+async function startAR() {
+  try {
+    // Запрос доступа к камере
+    const stream = await navigator.mediaDevices.getUserMedia({ 
+      video: { 
+        facingMode: "user",
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+      } 
+    });
+    
+    video.srcObject = stream;
+    cameraContainer.style.display = 'flex';
+    
+    // Имитация работы AR
+    simulateAR();
+  } catch (error) {
+    alert(`Ошибка доступа к камере: ${error.message}\nПожалуйста, разрешите доступ к камере в настройках браузера.`);
+    console.error('Camera error:', error);
+  }
+}
+
+// Функция имитации работы AR (так как MediaPipe требует HTTPS)
+function simulateAR() {
+  shirt.style.display = 'block';
+  
+  // Имитация отслеживания движения
+  video.addEventListener('loadedmetadata', () => {
+    const updatePosition = () => {
+      if (!cameraContainer.style.display || cameraContainer.style.display === 'none') return;
+      
+      // Центр экрана
+      const centerX = video.videoWidth / 2;
+      const centerY = video.videoHeight / 3;
+      
+      // Позиция футболки
+      shirt.style.left = `${centerX}px`;
+      shirt.style.top = `${centerY}px`;
+      
+      // Размер футболки (40% от ширины видео)
+      const shirtWidth = video.videoWidth * 0.4;
+      shirt.style.width = `${shirtWidth}px`;
+      
+      // Небольшая анимация для имитации "трекинга"
+      setTimeout(updatePosition, 100);
+    };
+    
+    updatePosition();
+  });
+}
+
+// Обработчики событий
+tryButton.addEventListener('click', startAR);
+closeButton.addEventListener('click', () => {
+  cameraContainer.style.display = 'none';
+  
+  // Остановка потока камеры
+  if (video.srcObject) {
+    video.srcObject.getTracks().forEach(track => track.stop());
+    video.srcObject = null;
+  }
+});
+
+// Плавное появление элементов
+document.querySelectorAll('.card, .header, .footer').forEach((el, index) => {
+  el.style.animationDelay = `${index * 0.2}s`;
+});
+</script>
+</body>
+</html>
