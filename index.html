@@ -74,14 +74,15 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+            transform: scaleX(-1);
         }
         
         #shirt {
             position: absolute;
-            transform: translate(-50%, -50%);
             pointer-events: none;
             z-index: 10;
             display: none;
+            transform: scaleX(-1);
         }
         
         #controls {
@@ -119,7 +120,8 @@
 <body>
     <div id="start-screen">
         <h1>Виртуальная примерка футболки</h1>
-        <img id="product-image" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Crect width='200' height='200' fill='%23f5f5f5'/%3E%3Cpath d='M40,60 L160,60 L170,90 L160,120 L40,120 L30,90 Z' fill='%234285f4'/%3E%3Ccircle cx='100' cy='80' r='15' fill='white'/%3E%3C/svg%3E" alt="Футболка">
+    src="image.png"
+        <img id="product-image" src="image.png" alt="Футболка">
         <p>Нажмите кнопку ниже, чтобы примерить футболку с помощью камеры</p>
         <button id="try-button">Примерить</button>
     </div>
@@ -128,7 +130,8 @@
         <div id="camera-view">
             <div class="loader">Загрузка...</div>
             <video id="camera" autoplay playsinline></video>
-            <img id="shirt" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 200'%3E%3Cpath d='M40,60 L160,60 L170,90 L160,120 L40,120 L30,90 Z' fill='%234285f4'/%3E%3Ccircle cx='100' cy='80' r='15' fill='white'/%3E%3C/svg%3E" alt="Футболка">
+         src="image.png"
+            <img id="shirt" src="image.png" alt="Футболка">
         </div>
         <div id="controls">
             <button id="back-button">Назад</button>
@@ -136,6 +139,12 @@
             <button id="flip-button">Перевернуть</button>
         </div>
     </div>
+
+    <!-- Подключаем библиотеки MediaPipe -->
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/control_utils/control_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils/drawing_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
 
     <script>
         // Элементы интерфейса
@@ -150,7 +159,9 @@
         
         let stream = null;
         let usingFrontCamera = true;
-        
+        let pose = null;
+        let cameraUtils = null;
+
         // Обработчики событий
         tryButton.addEventListener('click', startCamera);
         backButton.addEventListener('click', stopCamera);
@@ -175,50 +186,93 @@
                 camera.srcObject = stream;
                 status.textContent = 'Наведите камеру на себя';
                 
-                // Имитация AR (так как настоящий трекинг требует HTTPS и библиотек)
-                simulateAR();
+                // Инициализация Pose Detection
+                initPoseDetection();
                 
             } catch (error) {
                 status.textContent = 'Ошибка: ' + error.message;
                 console.error('Camera error:', error);
-                
-                // Показываем кнопку "Назад" при ошибке
                 backButton.style.display = 'block';
             }
         }
         
-        // Имитация работы AR
-        function simulateAR() {
+        // Инициализация Pose Detection
+        function initPoseDetection() {
+            pose = new Pose({
+                locateFile: (file) => {
+                    return `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`;
+                }
+            });
+            
+            pose.setOptions({
+                modelComplexity: 1,
+                smoothLandmarks: true,
+                minDetectionConfidence: 0.5,
+                minTrackingConfidence: 0.5
+            });
+            
+            pose.onResults(onPoseResults);
+            
+            cameraUtils = new Camera(camera, {
+                onFrame: async () => {
+                    await pose.send({image: camera});
+                },
+                width: 1280,
+                height: 720
+            });
+            
+            cameraUtils.start();
+        }
+        
+        // Обработка результатов Pose Detection
+        function onPoseResults(results) {
+            if (!results.poseLandmarks) {
+                shirt.style.display = 'none';
+                return;
+            }
+            
+            // Получаем ключевые точки плеч
+            const leftShoulder = results.poseLandmarks[11];
+            const rightShoulder = results.poseLandmarks[12];
+            
+            if (!leftShoulder || !rightShoulder) {
+                shirt.style.display = 'none';
+                return;
+            }
+            
+            // Рассчитываем позицию и размер футболки
+            const videoWidth = camera.videoWidth;
+            const videoHeight = camera.videoHeight;
+            
+            // Центр между плечами
+            const centerX = (leftShoulder.x + rightShoulder.x) / 2 * videoWidth;
+            const centerY = (leftShoulder.y + rightShoulder.y) / 2 * videoHeight;
+            
+            // Расстояние между плечами для определения размера
+            const shoulderDistance = Math.abs(leftShoulder.x - rightShoulder.x) * videoWidth;
+            const shirtWidth = shoulderDistance * 1.8;
+            const shirtHeight = shirtWidth * 1.2;
+            
+            // Позиционируем футболку
             shirt.style.display = 'block';
-            
-            // Центрируем футболку и делаем анимацию
-            const updatePosition = () => {
-                if (cameraScreen.style.display !== 'flex') return;
-                
-                const videoWidth = camera.videoWidth || window.innerWidth;
-                const videoHeight = camera.videoHeight || window.innerHeight;
-                
-                // Центр экрана (немного выше середины)
-                const centerX = videoWidth / 2;
-                const centerY = videoHeight / 3;
-                
-                // Размер футболки (40% от ширины видео)
-                const shirtWidth = videoWidth * 0.4;
-                
-                // Позиционируем футболку
-                shirt.style.left = centerX + 'px';
-                shirt.style.top = centerY + 'px';
-                shirt.style.width = shirtWidth + 'px';
-                
-                // Небольшая анимация для имитации "трекинга"
-                requestAnimationFrame(updatePosition);
-            };
-            
-            updatePosition();
+            shirt.style.left = `${centerX}px`;
+            shirt.style.top = `${centerY}px`;
+            shirt.style.width = `${shirtWidth}px`;
+            shirt.style.height = `${shirtHeight}px`;
         }
         
         // Остановка камеры
         function stopCamera() {
+            if (cameraUtils) {
+                cameraUtils.stop();
+                cameraUtils = null;
+            }
+            
+            if (pose) {
+                pose.close();
+                pose = null;
+            }
+            
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
                 stream = null;
@@ -239,8 +293,10 @@
         window.addEventListener('orientationchange', () => {
             if (cameraScreen.style.display === 'flex') {
                 setTimeout(() => {
-                    // Обновляем позицию после изменения ориентации
-                    simulateAR();
+                    if (cameraUtils) {
+                        cameraUtils.stop();
+                        cameraUtils.start();
+                    }
                 }, 300);
             }
         });
